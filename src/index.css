@@ -1,8 +1,0 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Your custom global styles can go here if needed */
-html[data-theme='dark'] {
-  color-scheme: dark; /* Helps with browser default dark styles for form elements etc. */
-}
