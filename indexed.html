@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Warehouse Flow - Final UI with Refined Panels</title>
+    <!-- Using the latest Plotly.js CDN -->
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <!-- Importing a clean, professional font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Make the layout fill the entire screen */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f0f2f5;
+            overflow: hidden;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        .header-container {
+            flex-shrink: 0;
+            padding: 10px 20px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        h1 {
+            text-align: center;
+            color: #1a252f;
+            margin: 0;
+            font-size: 1.2em;
+        }
+        /* New main content wrapper with 3-column layout */
+        .main-content {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        .metric-panel {
+            flex: 0 0 130px; /* Shrunk panel width */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 15px; /* Reduced padding */
+            background-color: #e9ecef;
+        }
+        .metric-box {
+            width: 100%;
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 10px; /* Reduced padding */
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+        .metric-box:last-child {
+            margin-bottom: 0;
+        }
+        .metric-label {
+            font-size: 11px; /* Shrunk font size */
+            color: #6c757d;
+            margin-bottom: 3px;
+        }
+        .metric-value {
+            font-size: 22px; /* Shrunk font size */
+            font-weight: 700;
+            color: #343a40;
+        }
+        /* New styles for sub-metrics */
+        .sub-metric-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 8px;
+        }
+        .sub-metric {
+            font-size: 10px;
+        }
+        .sub-metric-label {
+            color: #6c757d;
+        }
+        .sub-metric-value {
+            font-weight: 700;
+        }
+        .chart-wrapper {
+            flex-grow: 1;
+            position: relative;
+            overflow-y: auto; /* Allow scrolling for the chart area */
+        }
+        #sankeyContainer { 
+            width: 100%;
+        }
+        #gaugeOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .buffer-gauge {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            font-size: 8px;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(2px);
+            padding: 3px 6px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .gauge-bar-container {
+            position: relative;
+            width: 100px;
+            height: 16px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            margin: 0 4px;
+        }
+        .gauge-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+        }
+        .fill-normal { background-color: #66ccff; }
+        .fill-over { background-color: #ff9900; }
+        .fill-under { background-color: #d0d0d0; }
+        .gauge-bar-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 16px;
+            font-weight: bold;
+            color: #000;
+        }
+        .gauge-label {
+            min-width: 30px;
+            text-align: center;
+        }
+        .hours-of-work {
+            font-weight: bold;
+            color: #000;
+            margin-left: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1>Warehouse Flow</h1>
+    </div>
+    <div class="main-content">
+        <!-- Left Metric Panel -->
+        <div class="metric-panel">
+            <div class="metric-box">
+                <div class="metric-label">Total Work</div>
+                <div class="metric-value" id="total-work-value">0</div>
+                <div class="sub-metric-container">
+                    <div class="sub-metric">
+                        <div class="sub-metric-label">APU</div>
+                        <div class="sub-metric-value" id="apu-sub-value">0</div>
+                    </div>
+                    <div class="sub-metric">
+                        <div class="sub-metric-label">Gambler</div>
+                        <div class="sub-metric-value" id="gambler-sub-value">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Center Chart Area -->
+        <div class="chart-wrapper">
+            <div id="sankeyContainer"></div>
+            <div id="gaugeOverlay"></div>
+        </div>
+        <!-- Right Metric Panel -->
+        <div class="metric-panel">
+            <div class="metric-box">
+                <div class="metric-label">Shipped (SSF)</div>
+                <div class="metric-value" id="ssf-value">0</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">New Workable (NW)</div>
+                <div class="metric-value" id="nw-value">0</div>
+            </div>
+             <div class="metric-box">
+                <div class="metric-label">Net Flow</div>
+                <div class="metric-value" id="net-flow-value">0</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">AFE Caps</div>
+                <div class="sub-metric-container">
+                     <div class="sub-metric">
+                        <div class="sub-metric-label">AFE1</div>
+                        <div class="sub-metric-value" id="afe1-cap-value">0</div>
+                    </div>
+                    <div class="sub-metric">
+                        <div class="sub-metric-label">AFE2</div>
+                        <div class="sub-metric-value" id="afe2-cap-value">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. DEFINE MOCK DATA & CONFIG ---
+        const mockApiData = {
+            turValues: {
+                PPAFE1: 7669, PPAFE2: 9312, PPCubiscan: 65, PPLiquidate: 5420, PPMix: 0,
+                PPRc: 1000, PPRp: 10000, PPSingleSiOC: 2029, PPSingleSmall: 1667,
+                PPSmartPac: 615, PPSmartPacPoly: 1465, PPTransBHM1: 2600,
+                PPTransBOI2: 565, PPTransHOU2: 0, PPTransLGB3: 187
+            },
+            arValues: {
+                PPAFE1: 6336, PPAFE2: 7692, PPCubiscan: 42, PPLiquidate: 3528, PPMix: 1032,
+                PPRc: 288, PPRp: 540, PPSingleSiOC: 1692, PPSingleSmall: 2250,
+                PPSmartPac: 738, PPSmartPacPoly: 594, PPTransBHM1: 2580,
+                PPTransBOI2: 1146, PPTransHOU2: 708, PPTransLGB3: 330
+            },
+            bufferData: {
+                PPAFE1: { lower: 2288, current: 2668, upper: 3064, hours: 2.44 },
+                PPAFE2: { lower: 3296, current: 3642, upper: 4264, hours: 2.16 },
+                PPMix:  { lower: 1036, current: 1412, upper: 1344, hours: 4.24 },
+                PPSingleSmall: { lower: 800, current: 750, upper: 1050, hours: 1.67 },
+                PPSmartPac: { lower: 2530, current: 2368, upper: 3290, hours: 2.71 },
+                PPSmartPacPoly: { lower: 1816, current: 2550, upper: 2364, hours: 1.98 },
+                PPSingleSiOC: { lower: 1158, current: 852, upper: 1362, hours: 1.07 }
+            },
+            apu: 81666,
+            gambler: 3154,
+            ssf: 335078,
+            nw: 362503,
+            afe1cap: 7350,
+            afe2cap: 5208
+        };
+
+        // --- 2. DEFINE BUSINESS LOGIC RULES ---
+        const vrPathList = [
+            "PPRc", "PPRp", "PPDamagedGrading", "PPDisasterRelief", "PPFracsOfflineHold",
+            "PPFracsRcVRET", "PPFracsXDSimplePT", "PPGrading", "PPLiquidateDL", "PPLiquidate",
+            "PPMultiSlam", "PPRemoveHZMT", "PPCubiscan", "PPDonate", "PPRecycle", "PPRemove"
+        ];
+        const ghostPaths = ["PPBinCheckISS1"];
+        const explicitOutletPaths = ["PPTransBHM1", "PPTransBOI2", "PPTransHOU2", "PPTransLGB3"];
+
+        const colorPalette = {
+            packProcess: "rgba(0, 158, 224, 0.7)",
+            toOutlet: "rgba(120, 120, 120, 0.7)",
+            vrOutlet: "rgba(180, 180, 180, 0.7)",
+        };
+
+        function calculateLabelHeights(labels) {
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.visibility = 'hidden';
+            container.style.fontFamily = 'Inter, sans-serif';
+            container.style.fontSize = '9px';
+            document.body.appendChild(container);
+            const heights = labels.map(label => {
+                const el = document.createElement('div');
+                el.innerHTML = label;
+                container.appendChild(el);
+                const height = el.offsetHeight;
+                container.removeChild(el);
+                return height;
+            });
+            document.body.removeChild(container);
+            return heights;
+        }
+
+        function generateChartConfig(apiData) {
+            let { turValues, arValues } = apiData;
+            ghostPaths.forEach(p => { delete turValues[p]; delete arValues[p]; });
+
+            const standardPaths = Object.keys(arValues).filter(k => !vrPathList.includes(k) && !explicitOutletPaths.includes(k));
+            const activeVrPaths = vrPathList.filter(k => arValues[k] > 0);
+            const middleNodeOrder = [...standardPaths, ...explicitOutletPaths, ...activeVrPaths];
+            
+            const nodeNames = ["PICK", ...middleNodeOrder, "SHIP", "TO-Outlets", "VR-Outlets"];
+            
+            const calculateTotals = (values, isTur = false) => {
+                const totals = {};
+                if (isTur) {
+                    totals.PICK = Object.entries(values).filter(([k]) => !vrPathList.includes(k)).reduce((s, [,v]) => s + v, 0);
+                } else {
+                    totals.PICK = Object.values(values).reduce((a, b) => a + b, 0);
+                }
+                middleNodeOrder.forEach(key => totals[key] = values[key] || 0);
+                totals.SHIP = standardPaths.reduce((sum, key) => sum + (values[key] || 0), 0);
+                totals["TO-Outlets"] = explicitOutletPaths.reduce((sum, key) => sum + (values[key] || 0), 0);
+                totals["VR-Outlets"] = activeVrPaths.reduce((sum, key) => sum + (values[key] || 0), 0);
+                return totals;
+            };
+
+            const turTotals = calculateTotals(turValues, true);
+            const arTotals = calculateTotals(arValues);
+
+            const nodeLabelsWithTotals = nodeNames.map(name => {
+                const arTotal = arTotals[name] || 0;
+                const turTotal = turTotals[name] || 0;
+                if (vrPathList.includes(name)) return `${name}<br><b>AR: ${arTotal.toLocaleString()}</b>`;
+                return `${name}<br><b>AR: ${arTotal.toLocaleString()}</b><br>TUR: ${turTotal.toLocaleString()}`;
+            });
+
+            const flowUnitHeight = 0.02; 
+            const labelHeights = calculateLabelHeights(nodeLabelsWithTotals);
+            
+            const finalHeights = middleNodeOrder.map((key, index) => {
+                const flowHeight = (arValues[key] || 0) * flowUnitHeight;
+                const labelHeight = labelHeights[index + 1];
+                return Math.max(flowHeight, labelHeight);
+            });
+
+            const padding = 15;
+            const totalDynamicHeight = finalHeights.reduce((a, b) => a + b, 0) + (padding * (middleNodeOrder.length -1));
+            document.getElementById('sankeyContainer').style.height = `${totalDynamicHeight}px`;
+
+            let currentY = 0;
+            const middleNodeY = finalHeights.map(height => {
+                const nodeHeight = (height + padding) / totalDynamicHeight;
+                const yPos = currentY + (height / totalDynamicHeight) / 2;
+                currentY += nodeHeight;
+                return yPos;
+            });
+
+            const shipNodeY = 0.3;
+            const toOutletNodeY = 0.7;
+            const vrOutletNodeY = 0.9;
+            const nodeX = [ 0.01, ...Array(middleNodeOrder.length).fill(0.5), 0.99, 0.99, 0.99 ];
+            const nodeY = [ 0.5, ...middleNodeY, shipNodeY, toOutletNodeY, vrOutletNodeY ];
+            
+            const nodeAlignments = ['center', ...middleNodeOrder.map((_, i) => i % 2 === 0 ? 'right' : 'left'), 'center', 'center', 'center'];
+            
+            const source = [], target = [], arLinkValues = [], arLinkColors = [];
+            middleNodeOrder.forEach((key, index) => {
+                source.push(0); target.push(index + 1);
+                arLinkValues.push(arValues[key] || 0);
+            });
+            middleNodeOrder.forEach((key, index) => {
+                source.push(index + 1);
+                const isVrPath = vrPathList.includes(key);
+                const isToPath = explicitOutletPaths.includes(key);
+                if (isToPath) {
+                    target.push(nodeNames.indexOf('TO-Outlets'));
+                    arLinkColors.push(colorPalette.toOutlet);
+                } else if (isVrPath) {
+                    target.push(nodeNames.indexOf('VR-Outlets'));
+                    arLinkColors.push(colorPalette.vrOutlet);
+                } else {
+                    target.push(nodeNames.indexOf('SHIP'));
+                    arLinkColors.push(colorPalette.packProcess);
+                }
+                arLinkValues.push(arValues[key] || 0);
+            });
+            
+            const fullArLinkColors = [...arLinkColors, ...arLinkColors];
+
+            const arTrace = {
+                type: "sankey", orientation: "h", hoverinfo: 'all',
+                node: { 
+                    pad: 15, thickness: 20, label: nodeLabelsWithTotals, 
+                    color: 'rgba(0,0,0,0)', x: nodeX, y: nodeY,
+                    align: nodeAlignments
+                },
+                link: { source: source, target: target, value: arLinkValues, color: fullArLinkColors, hovertemplate: 'Actual: %{value:,}<extra></extra>' }
+            };
+
+            const plotlyLayout = {
+                font: { family: 'Inter, sans-serif', size: 9 },
+                autosize: true,
+                margin: { l: 80, r: 80, b: 40, t: 40, pad: 4 },
+                showlegend: false
+            };
+
+            return { data: [arTrace], layout: plotlyLayout, middleNodeY: middleNodeY, middleNodeOrder: middleNodeOrder };
+        }
+
+        function renderBufferGauges(chartConfig, apiData) {
+            const gaugeOverlay = document.getElementById('gaugeOverlay');
+            const sankeyContainer = document.getElementById('sankeyContainer');
+            gaugeOverlay.innerHTML = '';
+
+            const { middleNodeY, middleNodeOrder } = chartConfig;
+            const { bufferData } = apiData;
+
+            middleNodeOrder.forEach((nodeName, index) => {
+                const data = bufferData[nodeName];
+                if (!data) return;
+
+                const yPos = middleNodeY[index] * sankeyContainer.offsetHeight;
+                
+                const range = data.upper - data.lower;
+                const fillPercent = range > 0 ? Math.min(((data.current - data.lower) / range) * 100, 100) : (data.current >= data.upper ? 100 : 0);
+
+                let fillColorClass = 'fill-normal';
+                if (data.current > data.upper) {
+                    fillColorClass = 'fill-over';
+                } else if (data.current < data.lower) {
+                    fillColorClass = 'fill-under';
+                }
+
+                const gaugeEl = document.createElement('div');
+                gaugeEl.className = 'buffer-gauge';
+                gaugeEl.style.top = `${yPos - 13}px`;
+                gaugeEl.style.left = '20%'; // Adjusted position
+
+                gaugeEl.innerHTML = `
+                    <div class="gauge-label">${data.lower.toLocaleString()}</div>
+                    <div class="gauge-bar-container">
+                        <div class="gauge-bar-fill ${fillColorClass}" style="width: ${fillPercent}%;"></div>
+                        <div class="gauge-bar-text">${data.current.toLocaleString()}</div>
+                    </div>
+                    <div class="gauge-label">${data.upper.toLocaleString()}</div>
+                    <div class="hours-of-work">${data.hours.toFixed(2)}hrs</div>
+                `;
+                gaugeOverlay.appendChild(gaugeEl);
+            });
+        }
+
+        function renderChart() {
+            const arPickTotal = Object.values(mockApiData.arValues).filter((v, k) => !ghostPaths.includes(Object.keys(mockApiData.arValues)[k])).reduce((a, b) => a + b, 0);
+            const turPickTotal = Object.entries(mockApiData.turValues).filter(([k]) => !ghostPaths.includes(k) && !vrPathList.includes(k)).reduce((s, [,v]) => s + v, 0);
+            document.querySelector('h1').innerHTML = `Warehouse Flow | Pick (AR): ${arPickTotal.toLocaleString()} | Pick (TUR): ${turPickTotal.toLocaleString()}`;
+            
+            // Populate the metric panels
+            document.getElementById('total-work-value').innerText = (mockApiData.apu + mockApiData.gambler).toLocaleString();
+            document.getElementById('apu-sub-value').innerText = mockApiData.apu.toLocaleString();
+            document.getElementById('gambler-sub-value').innerText = mockApiData.gambler.toLocaleString();
+            document.getElementById('ssf-value').innerText = mockApiData.ssf.toLocaleString();
+            document.getElementById('nw-value').innerText = mockApiData.nw.toLocaleString();
+            document.getElementById('afe1-cap-value').innerText = mockApiData.afe1cap.toLocaleString();
+            document.getElementById('afe2-cap-value').innerText = mockApiData.afe2cap.toLocaleString();
+
+            const netFlow = mockApiData.nw - mockApiData.ssf;
+            const netFlowEl = document.getElementById('net-flow-value');
+            netFlowEl.innerText = netFlow.toLocaleString();
+            netFlowEl.style.color = netFlow >= 0 ? '#28a745' : '#dc3545'; // Green for positive, red for negative
+
+            const sankeyContainer = document.getElementById('sankeyContainer');
+            sankeyContainer.innerHTML = ''; // Clear previous chart
+            const chartConfig = generateChartConfig(mockApiData);
+            Plotly.newPlot(sankeyContainer, chartConfig.data, chartConfig.layout, {responsive: false}).then(() => {
+                renderBufferGauges(chartConfig, mockApiData);
+            });
+        }
+
+        // --- 3. INITIALIZE AND SET UP LISTENERS ---
+        renderChart();
+
+    </script>
+
+</body>
+</html>
